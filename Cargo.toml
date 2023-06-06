@@ -6,8 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-'ctru-rs' = { path = "../ctru-rs/ctru-rs" }
-ctru-sys = { path = "../ctru-rs/ctru-sys" }
+ctru-rs = { git = "https://github.com/rust3ds/ctru-rs" }
+ctru-sys = { git = "https://github.com/rust3ds/ctru-rs" }
 
-[patch.'https://github.com/rust3ds/ctru-rs']
-'ctru-sys' = { path = "../ctru-rs/ctru-sys" }
