@@ -1,0 +1,13 @@
+[package]
+name = "ipc-tools"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+'ctru-rs' = { path = "../ctru-rs/ctru-rs" }
+ctru-sys = { path = "../ctru-rs/ctru-sys" }
+
+[patch.'https://github.com/rust3ds/ctru-rs']
+'ctru-sys' = { path = "../ctru-rs/ctru-sys" }
