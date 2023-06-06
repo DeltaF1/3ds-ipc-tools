@@ -311,7 +311,7 @@ impl<'a> TranslateParams<'a> {
 
     /// Parse the translate params returned from an IPC call
     ///
-    /// The main purpose of doing this is to retrieve any [`Handle`]s that have been sent
+    /// The main purpose of this is to retrieve any [`Handle`]s that have been sent back
     pub fn parse_returned_params(params: &[u32]) -> TranslateParams<'_> {
         assert!(params.len() <= MAX_IPC_ARGS);
         let mut v = vec![];
@@ -375,6 +375,8 @@ impl<'a> TranslateParams<'a> {
         }
         TranslateParams(v)
     }
+
+    // TODO: function to retrieve handles
 }
 
 #[derive(Default)]
@@ -688,66 +690,4 @@ pub fn get_service_name(handle: Handle) -> ctru::Result<String> {
     ResultCode(res)?;
     let cstr = ffi::CStr::from_bytes_until_nul(&name).unwrap();
     Ok(String::from(cstr.to_str().unwrap()))
-}
-
-struct HTTPResponse {
-    code: u32,
-    body: String,
-}
-
-enum HTTPMethod {
-    GET,
-    POST,
-    PUT,
-    PATCH,
-    DELETE,
-}
-
-fn ipc_http_send(url: &str, method: HTTPMethod, body: &mut str) -> ctru::Result<HTTPResponse> {
-    #[repr(C)]
-    struct Params {
-        method: u32,
-        size: usize,
-    }
-
-    #[repr(C)]
-    struct ReturnParams {
-        status: u32,
-    }
-
-    let params = Params {
-        method: method as u32,
-        size: body.len(),
-    };
-
-    const BUFFER_LENGTH: usize = 4096;
-    let mut output = vec![0u8; BUFFER_LENGTH];
-
-    let url = CString::new(url).unwrap();
-
-    let mut translated = TranslateParams::new();
-    translated
-        // Write the url to static buffer 0 in the server
-        .add_static_buffer(0, url.as_bytes_with_nul())
-        .add_read_buffer(body.as_bytes())
-        .add_write_buffer(&mut output);
-
-    let mut static_receive_params = StaticReceiveParams::new();
-
-    let mut content_type = [0u8; 256];
-
-    static_receive_params.add_receive_buffer(0, &mut content_type);
-
-    let handle = 0;
-    let (return_params, _translate_params): (ReturnParams, TranslateParams) =
-        unsafe { send_cmd(handle, 0x420, params, translated, static_receive_params) }?;
-
-    // TODO: Validate that all buffers were returned in translate_params
-
-    let body = String::from_utf8(output).unwrap();
-
-    Ok(HTTPResponse {
-        code: return_params.status,
-        body,
-    })
 }
