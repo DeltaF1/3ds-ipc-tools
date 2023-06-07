@@ -239,6 +239,8 @@ impl<'a> TranslateParams<'a> {
 
     // TODO: Rename to "send_static_buffer" or something to make it clear it's not for receiving
     /// Copy a buffer to the destination process's i-th static buffer.
+    ///
+    /// Immutably borrows `buffer` for the duration of the IPC call
     pub fn add_static_buffer<T: ?Sized>(
         &mut self,
         destination_buffer_index: usize,
@@ -295,7 +297,7 @@ impl<'a> TranslateParams<'a> {
     /// # Safety
     ///
     /// Calling this can create dangling pointers if the original [`TranslateParams`]
-    /// is dropped before this is used, since that will free up the lifetimes of the
+    /// is dropped before the Vec is used, since that will free up the lifetimes of the
     /// references that were used to create it.
     pub fn finish(&self) -> Vec<u32> {
         self.0.iter().flat_map(Into::<Vec<u32>>::into).collect()
@@ -389,6 +391,7 @@ impl<'a> StaticReceiveParams<'a> {
     pub fn new() -> Self {
         StaticReceiveParams::default()
     }
+
     pub fn add_receive_buffer<T>(&mut self, i: usize, r: &'a mut T) {
         debug_assert!(
             self.buffers[i].is_none(),
@@ -402,6 +405,7 @@ impl<'a> StaticReceiveParams<'a> {
     }
 }
 
+// TODO: Define safety requirements more rigorously
 /// Send an IPC command to a service handle
 ///
 /// # Safety
@@ -426,13 +430,12 @@ impl<'a> StaticReceiveParams<'a> {
 ///    command might send data to.
 /// 3. In the case of a 0 (non-error) Result, the size of `R` (in `u32`s) must be equal to `normal_params - 1` in
 ///    the returned IPC response header.
-/// 4. In the case of a 0 (non-error) Result, the normal params portion of the response
-///    (excluding the first param which is reserved for the Result code) must be initialized
-///    for type `R`.
-///
+/// 4.  The caller must ensure that a valid object of type R is
+///     stored at ThreadCommandBuffer + 0x02 upon success of the command.
 pub unsafe fn send_cmd<'a, T, R>(
     handle: Handle,
     command_id: u16, // TODO: take in an IPCHeader instead and assert that the sizes match?
+                     //       This would make it easier to ensure that the params match the wiki
     obj: T,
     translate: TranslateParams,
     static_receive_buffers: StaticReceiveParams,
@@ -473,7 +476,7 @@ pub unsafe fn send_cmd<'a, T, R>(
     // Syscall
     let res = ctru_sys::svcSendSyncRequest(handle);
 
-    // Delete all the static buffer descriptors after the call is done
+    // Delete all the static buffer descriptors after the call is done, even if it failed
     unsafe {
         for (i, buffer) in static_receive_buffers.buffers.iter().enumerate() {
             if buffer.is_some() {
@@ -503,7 +506,7 @@ pub unsafe fn send_cmd<'a, T, R>(
     }
 
     // This part is potentially unsound dependent upon safe code >.<
-    // E.g. if R does not fit the return data then the type will be invalid
+    // E.g. if the return data is not valid for R then the type will be invalid
     let retval = ipc_buf.add(2) as *const R;
 
     // SAFETY: This ref is dropped at the end of this method
@@ -522,7 +525,7 @@ const fn bytes_to_words(bytes: usize) -> usize {
     (bytes + size_of::<WORD>() - 1) / size_of::<WORD>()
 }
 
-// TODO: How can this be 64 when the command buffer is only 64? Can you hold
+// TODO: What is the actual limit here? It might be 63 because the header takes up 1 
 pub const MAX_IPC_ARGS: usize = 64;
 
 // TODO: Parse pages from the 3dbrew wiki for T, R
@@ -534,9 +537,14 @@ pub const MAX_IPC_ARGS: usize = 64;
 /// Panics if the sizes of types T or R are > [`MAX_IPC_ARGS`] `* size_of::<u32>()`.
 ///
 /// # Safety
+/// In general, to use an IPC command safely you should read the [3dbrew
+/// wiki](https://www.3dbrew.org/wiki/) page for that command.
 ///
-/// The caller must ensure that a valid object of type R is
-/// stored at ThreadCommandBuffer + 0x02 upon success of the command.
+/// This is a non-exhaustive list of safety requirements to use this function. This is a foreign call
+/// so the receiving code could do anything! See [`send_cmd`] for more details
+///
+/// 1. The caller must ensure that a valid object of type R is
+///    stored at ThreadCommandBuffer + 0x02 upon success of the command.
 pub unsafe fn send_struct<T, R>(
     handle: Handle,
     command_id: u16,
@@ -622,6 +630,7 @@ unsafe fn set_static_buffer(i: usize, buffer_descriptor: StaticBufferPair) {
     base.add(i).write(buffer_descriptor);
 }
 
+/// Acquire a handle to the named service. Hangs if handle is not available
 pub fn get_service_handle(name: &str) -> ctru::Result<Handle> {
     let cstr = CString::new(name).unwrap();
     let mut handle: Handle = 0;
