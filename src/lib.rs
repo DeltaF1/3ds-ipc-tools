@@ -439,7 +439,7 @@ pub unsafe fn send_cmd<'a, T, R>(
     obj: T,
     translate: TranslateParams,
     static_receive_buffers: StaticReceiveParams,
-) -> Result<(R, TranslateParams<'a>), ctru_sys::Result> {
+) -> ctru::Result<(R, TranslateParams<'a>)> {
     assert!(bytes_to_words(size_of::<T>()) <= MAX_IPC_ARGS);
     assert!(bytes_to_words(size_of::<R>()) <= MAX_IPC_ARGS);
 
@@ -486,7 +486,7 @@ pub unsafe fn send_cmd<'a, T, R>(
     }
 
     if res < 0 {
-        return Err(res);
+        return Err(res.into());
     }
 
     let response_header = *ipc_buf;
@@ -502,7 +502,7 @@ pub unsafe fn send_cmd<'a, T, R>(
 
     let res = *ipc_buf.add(1) as i32;
     if res < 0 {
-        return Err(res);
+        return Err(res.into());
     }
 
     // This part is potentially unsound dependent upon safe code >.<
@@ -545,11 +545,7 @@ pub const MAX_IPC_ARGS: usize = 64;
 ///
 /// 1. The caller must ensure that a valid object of type R is
 ///    stored at ThreadCommandBuffer + 0x02 upon success of the command.
-pub unsafe fn send_struct<T, R>(
-    handle: Handle,
-    command_id: u16,
-    obj: T,
-) -> Result<R, ctru_sys::Result> {
+pub unsafe fn send_struct<T, R>(handle: Handle, command_id: u16, obj: T) -> ctru::Result<R> {
     assert!(bytes_to_words(size_of::<T>()) <= MAX_IPC_ARGS);
     assert!(bytes_to_words(size_of::<R>()) <= MAX_IPC_ARGS);
     let ipc = tls::getThreadCommandBuffer();
@@ -563,7 +559,7 @@ pub unsafe fn send_struct<T, R>(
     (ipc.add(1) as *mut T).write(obj);
     let res = ctru_sys::svcSendSyncRequest(handle);
     if res < 0 {
-        return Err(res);
+        return Err(res.into());
     }
 
     let response_header = *ipc;
@@ -580,7 +576,7 @@ pub unsafe fn send_struct<T, R>(
     // SAFETY: u32 is Copy
     let res = *ipc.add(1) as i32;
     if res < 0 {
-        return Err(res);
+        return Err(res.into());
     }
 
     // This part is potentially unsound dependent upon safe code >.<
