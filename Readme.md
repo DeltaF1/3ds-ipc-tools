@@ -127,7 +127,7 @@ In the case of mapped buffers there is no need to do anything with this return d
 |6 |(Working Buffer Size << 4) | 0xC|
 |7 |Working Buffer Pointer |
 
-4. Now it's time to put all of this together. First start by defining the signature of our wrapper function.
+4. Now it's time to put all of this together.
 
 ```rs
 fn ReadTwlBackupInfo(
@@ -142,7 +142,7 @@ fn ReadTwlBackupInfo(
         working_buffer_size: usize,
     }
 
-    // Assuming we have 
+    // Assuming we have some structs already defined for these parameters
     let mut output_info = TwlBackupInfo::new();
     let mut banner = Banner::new();
     let mut working_buffer = [0u8; 0x4000];
