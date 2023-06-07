@@ -2,6 +2,8 @@
 # ipc-tools
 library to help make safe IPC wrappers for ctru-rs
 
+Thanks to piepie62, declan, Kartik on the Nintendo Homebrew Discord for answering my questions about IPC semantics.
+
 ## How to use
 
 Install devKitPro and https://github.com/rust3ds/cargo-3ds/.
