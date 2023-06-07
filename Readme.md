@@ -1,11 +1,21 @@
 # ipc-tools
+library to help make safe IPC wrappers for ctru-rs
 
+## How to use
+
+Install devKitPro and https://github.com/rust3ds/cargo-3ds/.
+
+The two main entry points for this library are `send_struct` and `send_cmd`. `send_struct` is a simple wrapper for IPC commands that only have normal params in the request and response. `send_cmd` has more arguments which allow it to express IPC commands with translate params and static buffer-returned values.
+
+For more information run `cargo 3ds doc`.
+
+## Example
 
 1. Find the wiki page for the command you want to wrap. In this example we will be using https://www.3dbrew.org/wiki/AM:ReadTwlBackupInfo.
 
 2. Look at the "Request" table on the wiki page
 
-i. The first word in the table is the header, whose format is here: https://www.3dbrew.org/wiki/IPC#Message_Structure
+The first word in the table is the header, whose format is here: https://www.3dbrew.org/wiki/IPC#Message_Structure
 
 |Index Word |Description|
 |:----|:----|
@@ -17,7 +27,7 @@ From this header we can see that the command id is 0x001E, there are 3 normal pa
 const COMMAND: u16 = 0x001E;
 ```
 
-ii. From the above header we know that the next 3 words are "normal" params which means they are passed directly to the destination process without modification.
+From the above header we know that the next 3 words are "normal" params which means they are passed directly to the destination process without modification.
 
 |Index Word |Description|
 |:----|:----|
@@ -34,17 +44,15 @@ struct Params {
     banner_size: usize,
     working_buffer_size: usize
 }
-
-type T = Params;
 ```
 
-iii. The next 8 words are the "translate" params. These parameters are used to transfer larger or more complicated pieces of data between processes. Each paramter consists of a header followed by some number of data words afterwards. To encapsulate these parameters we construct a `TranslateParams` struct.
+The next 8 words are the "translate" params. These parameters are used to transfer larger or more complicated pieces of data between processes. Each paramter consists of a header followed by some number of data words afterwards. To encapsulate these parameters we construct a `TranslateParams` struct.
 
 ```rs
 let mut translate_params = TranslateParams::new();
 ```
 
-a. The first parameter has a header to move one (1) Handle to the destination process. From the wiki section about [Handle translation](https://www.3dbrew.org/wiki/IPC#Handle_Translation) we can see that this header has the "close for caller" bit set.
+The first parameter has a header to move one (1) Handle to the destination process. From the wiki section about [Handle translation](https://www.3dbrew.org/wiki/IPC#Handle_Translation) we can see that this header has the "close for caller" bit set.
 
 |Index Word |Description|
 |:----|:----|
@@ -56,7 +64,7 @@ a. The first parameter has a header to move one (1) Handle to the destination pr
 translate_params.add_handles(true, false, vec![file_handle]);
 ```
 
-b. The second paramater ends in `0xC` which means it's a write-only [mapped buffer descriptor](https://www.3dbrew.org/wiki/IPC#Buffer_Mapping_Translation). 
+The second paramater ends in `0xC` which means it's a write-only [mapped buffer descriptor](https://www.3dbrew.org/wiki/IPC#Buffer_Mapping_Translation). 
 
 |Index Word |Description|
 |:----|:----|
@@ -71,7 +79,7 @@ let mut output_info = TwlBackupInfo::new();
 translate_params.add_write_buffer(&mut output_info)
 ```
 
-c. The next two parameters are similar
+The next two parameters are similar
 
 |Index Word |Description|
 |:----|:----|
@@ -88,24 +96,24 @@ let mut working_buffer = [0u8; 0x4000];
 translate_params.add_write_buffer(&mut working_buffer);
 ```
 
-c. Finally, look at the "Response" table
+3. Finally, look at the "Response" table
 
-i. The first word of response is again an IPC command header. This has no use to the programmer other than getting the number of return parameters, but the library will take care of that part.
+The first word of response is again an IPC command header. This has no use to the programmer other than getting the number of return parameters, but the library will take care of that part.
 
 |Index Word |Description|
 |:----|:----|
 |0 |Header code|
 
-ii. The next word is a Result code. This value will be an error code if the call failed for some reason, or 0 if it succeeded. This is also taken care of by the library.
+The next word is a Result code. This value will be an error code if the call failed for some reason, or 0 if it succeeded. This is also taken care of by the library.
 
 |Index Word |Description|
 |:----|:----|
 |1 |Result code|
 
-iii. The words following the result code are the return parameters. Most wiki pages don't say exlicitly which ones are normal params and which are translated, but it's usually easy to deduce from context clues (e.g. we can see the `0xC` descriptor tag and the fact that "pointers" are mentioned). In this case there are no normal parameters and the buffers we mapped earlier are returned to us as translate parameters. The lack of normal parameters can be represented by passing `()` as the type for R.
+The words following the result code are the return parameters. Most wiki pages don't say exlicitly which ones are normal params and which are translated, but it's usually easy to deduce from context clues (e.g. we can see the `0xC` descriptor tag and the fact that "pointers" are mentioned). In this case there are no normal parameters and the buffers we mapped earlier are returned to us as translate parameters. The lack of normal parameters can be represented by passing `()` as the return type.
 
 ```rs
-type R = ();
+type Return = ();
 ```
 
 In the case of mapped buffers there is no need to do anything with this return data so we can move on.
@@ -134,8 +142,6 @@ fn ReadTwlBackupInfo(
         working_buffer_size: usize,
     }
 
-    type T = Params;
-
     // Assuming we have 
     let mut output_info = TwlBackupInfo::new();
     let mut banner = Banner::new();
@@ -157,9 +163,9 @@ fn ReadTwlBackupInfo(
         .add_write_buffer(&mut working_buffer);
 
     // In this case there are no parameters being passed back and we don't care about the translate parameters 
-    type R = ();
-    let (_normal_return, _translate_return): (R, TranslateParams) = unsafe {
-        ipc_tools::send_cmd::<T, R>(
+    type Return = ();
+    let (_normal_return, _translate_return): (Return, TranslateParams) = unsafe {
+        ipc_tools::send_cmd::<Params, Return>(
             service_handle,
             COMMAND,
             params,
