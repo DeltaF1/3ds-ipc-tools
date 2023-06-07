@@ -225,7 +225,7 @@ impl<'a> TranslateParams<'a> {
     /// Send handles to the destination process
     pub fn add_handles(
         &mut self,
-        closed_for_caller: bool,
+        closed_for_caller: bool, // TODO: Replace this with a HandleOptions enum
         replace_with_process_id: bool,
         handles: Vec<Handle>,
     ) -> &mut Self {
