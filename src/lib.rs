@@ -295,7 +295,7 @@ impl<'a> TranslateParams<'a> {
     }
 
     // TODO: self vs &self? Should this be unsafe?
-    /// Serialize into the format expected by [`svcSendSyncRequest`]
+    /// Serialize into the format expected by [`ctru_sys::svcSendSyncRequest`]
     ///
     /// # Safety
     ///
@@ -439,6 +439,14 @@ impl<'a> StaticReceiveParams<'a> {
     }
 }
 
+// Make it easier to ensure that the params match the header on the wiki
+fn check_command_header<T>(header: u32, _normal: &T, translate: &TranslateParams) {
+    let header: IPCHeader = header.into();
+
+    assert_eq!(header.normal_params, size_of::<T>());
+    assert_eq!(header.translate_params, translate.finish().len());
+}
+
 // TODO: Define safety requirements more rigorously
 /// Send an IPC command to a service handle
 ///
@@ -468,8 +476,7 @@ impl<'a> StaticReceiveParams<'a> {
 ///     stored at ThreadCommandBuffer + 0x02 upon success of the command.
 pub unsafe fn send_cmd<'a, T, R>(
     handle: Handle,
-    command_id: u16, // TODO: take in an IPCHeader instead and assert that the sizes match?
-    //       This would make it easier to ensure that the params match the wiki
+    command_id: u16,
     obj: T,
     translate: TranslateParams,
     static_receive_buffers: StaticReceiveParams,
