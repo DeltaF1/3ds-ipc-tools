@@ -7,7 +7,8 @@ use std::{
     arch::asm,
     ffi::{c_void, CString},
     marker::PhantomData,
-    mem::{size_of, size_of_val, zeroed},
+    mem::{size_of, size_of_val, MaybeUninit},
+    ptr::NonNull,
 };
 
 // TODO: Delete this in favour of implementing this in ctru_sys
@@ -434,7 +435,8 @@ impl<'a> StaticReceiveParams<'a> {
 
         self.buffers[i] = Some(StaticBufferPair {
             descriptor: static_buffer_descriptor(i, size_of_val(r)),
-            buffer: r as *mut _ as _,
+            // SAFETY: References are always non-null
+            buffer: unsafe { NonNull::new_unchecked(r as *mut _ as _) },
         });
     }
 }
@@ -527,7 +529,7 @@ pub unsafe fn send_cmd<'a, T, R>(
     unsafe {
         for (i, buffer) in static_receive_buffers.buffers.iter().enumerate() {
             if buffer.is_some() {
-                get_static_buffer(i);
+                clear_static_buffer(i);
             }
         }
     }
@@ -637,37 +639,34 @@ pub unsafe fn send_struct<T, R>(handle: Handle, command_id: u16, obj: T) -> ctru
 #[derive(Clone)]
 struct StaticBufferPair {
     descriptor: u32,
-
-    // TODO: NotNull<c_void> ?
-    // Some IPC calls might use the null as a marker though like in the case of null pointers in https://www.3dbrew.org/wiki/AM:ReadTwlBackupInfo
-    buffer: *mut c_void,
+    buffer: NonNull<c_void>,
 }
 
-// TODO: Would be nice if all calls to IPC commands needed a &mut threadCommandBuffer/threadStaticBuffer
-/// Retrieve the i-th static buffer
+/// Clear the i-th static buffer descriptor
 ///
 /// # Safety
 ///
-/// The specified buffer must have been initialized by a previous IPC call or call to [set_static_buffer]
-///
-/// The returned pointer is only valid until the next IPC call at which time
-/// it may be overwritten by the kernel.
-unsafe fn get_static_buffer(i: usize) -> StaticBufferPair {
-    assert!(i <= 16);
-    let base = tls::getThreadStaticBuffer() as *mut StaticBufferPair;
+/// Leaving the buffer cleared before making an IPC call that will return data to the i-th buffer
+/// is Undefined Behavior.
+unsafe fn clear_static_buffer(i: usize) {
+    assert!(i < 16);
+    let base = tls::getThreadStaticBuffer() as *mut MaybeUninit<StaticBufferPair>;
 
-    // Zero out the static buffer pair when reading so that future calls won't accidentally still have a pointer
-    base.add(i).replace(zeroed())
+    // Zero out the static buffer pair when reading so that future calls that forget to set the static buffers
+    // won't still have a stale pointer lying around to be written to by the kernel
+    base.add(i).write(MaybeUninit::zeroed())
 }
 
 /// Sets up a static buffer desciptor and the corresponding pointer for use in a subsequent IPC call
 ///
 /// # Safety
 ///
-/// The pointer must be valid when an IPC call that references the i-th buffer is made
+/// The size of the buffer must be at least as large as the size of the data that will be returned
+/// by the next IPC call into the i-th buffer.
+/// The buffer pointer must be valid when an IPC call that returns data into the i-th buffer is made
 #[inline]
 unsafe fn set_static_buffer(i: usize, buffer_descriptor: StaticBufferPair) {
-    assert!(i <= 16);
+    assert!(i < 16);
     let base = tls::getThreadStaticBuffer() as *mut StaticBufferPair;
     base.add(i).write(buffer_descriptor);
 }
