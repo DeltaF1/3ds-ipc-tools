@@ -26,7 +26,7 @@ The first word in the table is the header, whose format is here: https://www.3db
 
 From this header we can see that the command id is 0x001E, there are 3 normal params, and there are 8 translate params.
 
-```rs
+```rust
 const COMMAND: u16 = 0x001E;
 ```
 
@@ -40,7 +40,7 @@ From the above header we know that the next 3 words are "normal" params which me
 
 We can represent these as a simple struct:
 
-```rs
+```rust
 #[repr(C)] // ⚠️ This part is very important to ensure that all these fields are in the correct order without padding in between ⚠️
 struct Params {
     output_info_size: usize,
@@ -51,32 +51,32 @@ struct Params {
 
 The next 8 words are the "translate" params. These parameters are used to transfer larger or more complicated pieces of data between processes. Each paramter consists of a header followed by some number of data words afterwards. To encapsulate these parameters we construct a `TranslateParams` struct.
 
-```rs
+```rust
 let mut translate_params = TranslateParams::new();
 ```
-
-The first parameter has a header to move one (1) Handle to the destination process. From the wiki section about [Handle translation](https://www.3dbrew.org/wiki/IPC#Handle_Translation) we can see that this header has the "close for caller" bit set.
 
 |Index Word |Description|
 |:----|:----|
 |4 |0x10 (Magic Word Header, 0x10 = HANDLE_MOVE, we are moving this handle into the IPC server)|
 |5 |FSFile Handle|
 
-```rs
-// Assuming that we already have a handle to the correct file called `file_handle`
-translate_params.add_handles(true, false, vec![file_handle]);
-```
+The first parameter has a header to move one (1) Handle to the destination process. From the wiki section about [Handle translation](https://www.3dbrew.org/wiki/IPC#Handle_Translation) we can see that this header has the "close for caller" bit set. This means that the handles are moved into the receiving process and are no longer valid for the sending process.
 
-The second paramater ends in `0xC` which means it's a write-only [mapped buffer descriptor](https://www.3dbrew.org/wiki/IPC#Buffer_Mapping_Translation). 
+```rust,ignore
+// Assuming that we already have a handle to the correct file called `file_handle`
+translate_params.add_handles(HandleOptions::MoveHandles, vec![file_handle]);
+```
 
 |Index Word |Description|
 |:----|:----|
 |6 |(Output Info Size << 4) \| 0xC|
 |7 |TwlBackupInfo Output Pointer. Processing is skipped for this when the pointer is NULL.|
 
+The second paramater ends in `0xC` which means it's a write-only [mapped buffer descriptor](https://www.3dbrew.org/wiki/IPC#Buffer_Mapping_Translation). 
+
 We can add one of these parameters with a mutable reference.
 
-```rs
+```rust,ignore
 // Assuming we have a struct TwlBackupInfo
 let mut output_info = TwlBackupInfo::new();
 translate_params.add_write_buffer(&mut output_info)
@@ -91,7 +91,7 @@ The next two parameters are similar
 |10 |(Working Buffer Size << 4) \| 0xC|
 |11 |Working Buffer Pointer |
 
-```rs
+```rust,ignore
 let mut banner = Banner::new();
 translate_params.add_write_buffer(&mut banner);
 
@@ -115,11 +115,9 @@ The next word is a Result code. This value will be an error code if the call fai
 
 The words following the result code are the return parameters. Most wiki pages don't say exlicitly which ones are normal params and which are translated, but it's usually easy to deduce from context clues (e.g. we can see the `0xC` descriptor tag and the fact that "pointers" are mentioned). In this case there are no normal parameters and the buffers we mapped earlier are returned to us as translate parameters. The lack of normal parameters can be represented by passing `()` as the return type.
 
-```rs
+```rust
 type Return = ();
 ```
-
-In the case of mapped buffers there is no need to do anything with this return data so we can move on.
 
 |Index Word |Description|
 |:----|:----|
@@ -130,9 +128,11 @@ In the case of mapped buffers there is no need to do anything with this return d
 |6 |(Working Buffer Size << 4) | 0xC|
 |7 |Working Buffer Pointer |
 
+In the case of mapped buffer descriptors there is no need to do anything with them when they are returned from an IPC call, so we can move on.
+
 4. Now it's time to put all of this together.
 
-```{no_run, rust}
+```rust,no_run
 # // Stubbed types
 # struct Banner {} struct TwlBackupInfo {}
 # impl Banner {fn new() -> Self { todo!() } } impl TwlBackupInfo { fn new() -> Self { todo!() } }
