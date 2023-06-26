@@ -244,17 +244,18 @@ impl<'a> TranslateParams<'a> {
     pub fn add_static_buffer<T: ?Sized>(
         &mut self,
         destination_buffer_index: usize,
-        buffer: &'a T,
+        buffer: &'a T, // TODO: Option<&'a T> to account for null cases
     ) -> &mut Self {
         self.0.push(Translation::Static {
             static_index: destination_buffer_index,
-            ptr: buffer as *const T as _,
+            ptr: buffer as *const T as _, // If None, null-ptr
             len: size_of_val(buffer),
             _marker: PhantomData,
         });
         self
     }
 
+    // TODO: Option<&'a T> to account for null cases
     /// Map a buffer into the destination's memory space with read-only permissions
     ///
     /// Immutably borrows `buffer` for the duration of the IPC call
@@ -267,6 +268,7 @@ impl<'a> TranslateParams<'a> {
         self
     }
 
+    // TODO: Option<&'a mut T> to account for null cases
     /// Map a buffer into the destination's memory space with write-only permissions
     ///
     /// Mutably borrows `buffer` for the duration of the IPC call
