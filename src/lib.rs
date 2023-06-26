@@ -303,14 +303,6 @@ impl<'a> TranslateParams<'a> {
         self.0.iter().flat_map(Into::<Vec<u32>>::into).collect()
     }
 
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
     /// Parse the translate params returned from an IPC call
     ///
     /// The main purpose of this is to retrieve any [`Handle`]s that have been sent back
@@ -423,7 +415,7 @@ impl<'a> StaticReceiveParams<'a> {
 ///     ```
 ///    must be equal to the expected `normal_params` and
 ///     ```rs
-///     translate_params.len()
+///     translate_params.finish().len()
 ///     ```
 ///    must be equal to the expected `translate_params`.
 /// 2. `static_receive_buffers` must contain an entry for each of the static buffers that the IPC
