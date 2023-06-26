@@ -132,7 +132,14 @@ In the case of mapped buffers there is no need to do anything with this return d
 
 4. Now it's time to put all of this together.
 
-```rs
+```{no_run, rust}
+# // Stubbed types
+# struct Banner {} struct TwlBackupInfo {}
+# impl Banner {fn new() -> Self { todo!() } } impl TwlBackupInfo { fn new() -> Self { todo!() } }
+use std::mem::size_of_val;
+use ctru_sys::Handle;
+use ipc_tools::HandleOptions;
+
 fn ReadTwlBackupInfo(
     service_handle: Handle,
     file_handle: Handle,
@@ -160,14 +167,14 @@ fn ReadTwlBackupInfo(
     // Adding translate params can be chained together for convenience
     let mut translate_params = ipc_tools::TranslateParams::new();
     translate_params
-        .add_handles(true, false, vec![file_handle])
+        .add_handles(HandleOptions::MoveHandles, vec![file_handle])
         .add_write_buffer(&mut output_info)
         .add_write_buffer(&mut banner)
         .add_write_buffer(&mut working_buffer);
 
     // In this case there are no parameters being passed back and we don't care about the translate parameters 
     type Return = ();
-    let (_normal_return, _translate_return): (Return, TranslateParams) = unsafe {
+    let (_normal_return, _translate_return): (Return, ipc_tools::TranslateParams) = unsafe {
         ipc_tools::send_cmd::<Params, Return>(
             service_handle,
             COMMAND,

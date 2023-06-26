@@ -1,4 +1,5 @@
 #![feature(iter_advance_by)]
+#![doc = include_str!("../Readme.md")]
 
 use core::{ffi, panic};
 use ctru::error::ResultCode;
@@ -392,16 +393,9 @@ impl<'a> StaticReceiveParams<'a> {
     /// [FRDU:GetMyPassword](https://www.3dbrew.org/wiki/FRDU:GetMyPassword) copies the password
     /// into a pre-prepared static buffer upon return.
     ///
-    /// ```
+    /// ```no_run
     /// # use ipc_tools::*;
     /// # use ctru_sys::Handle;
-    /// # pub unsafe fn send_cmd<'a, T, R>(
-    /// # handle: Handle,
-    /// # command_id: u16,
-    /// # obj: T,
-    /// # translate: TranslateParams<'_>,
-    /// # static_receive_buffers: StaticReceiveParams<'_>
-    /// # ) -> ctru::Result<((), TranslateParams<'a>)> {Ok(((), TranslateParams::new()))}
     /// # let frdu_handle: Handle = 0x0;
     /// const MAX_BUFFER_SIZE: usize = 0x100;
     /// let mut password = [0u8; MAX_BUFFER_SIZE];
