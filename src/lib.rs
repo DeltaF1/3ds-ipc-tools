@@ -46,7 +46,7 @@ pub struct IPCHeader {
 
 impl IPCHeader {
     pub fn new(command: u16, normal_params: usize, translate_params: usize) -> Self {
-        assert!(normal_params + translate_params <= MAX_IPC_ARGS);
+        assert!(normal_params + translate_params <= IPC_CMDBUF_WORDS - 1);
         IPCHeader {
             command,
             normal_params,
@@ -309,7 +309,7 @@ impl<'a> TranslateParams<'a> {
     ///
     /// The main purpose of this is to retrieve any [`Handle`]s that have been sent back
     pub fn parse_returned_params(params: &[u32]) -> TranslateParams<'_> {
-        assert!(params.len() <= MAX_IPC_ARGS);
+        assert!(params.len() <= IPC_CMDBUF_WORDS);
         let mut v = vec![];
         let mut iter = params.iter().enumerate();
         while let Some((i, header)) = iter.next() {
@@ -480,13 +480,19 @@ impl<'a> StaticReceiveParams<'a> {
 pub unsafe fn send_cmd<'a, T, R>(
     handle: Handle,
     command_id: u16, // TODO: take in an IPCHeader instead and assert that the sizes match?
-                     //       This would make it easier to ensure that the params match the wiki
+    //       This would make it easier to ensure that the params match the wiki
     obj: T,
     translate: TranslateParams,
     static_receive_buffers: StaticReceiveParams,
 ) -> ctru::Result<(R, TranslateParams<'a>)> {
-    assert!(bytes_to_words(size_of::<T>()) <= MAX_IPC_ARGS);
-    assert!(bytes_to_words(size_of::<R>()) <= MAX_IPC_ARGS);
+    // TODO: Explicitly do this as consts if possible
+    assert!(size_of::<T>() % size_of::<u32>() == 0);
+    assert!(bytes_to_words(size_of::<T>()) <= IPC_CMDBUF_WORDS - 1); // Account for the header
+    assert!(bytes_to_words(size_of::<R>()) <= IPC_CMDBUF_WORDS - 2); // Account for header+response code
+
+    let translated_raw = translate.finish();
+    // There's only IPC_CMDBUF_WORDS words in the IPC cmdbuf that the translate params and normal params have to share
+    assert!(bytes_to_words(size_of::<T>()) + bytes_to_words(translated_raw.len()) <= IPC_CMDBUF_WORDS - 1);
 
     unsafe {
         for (i, buffer) in static_receive_buffers.buffers.iter().enumerate() {
@@ -496,9 +502,6 @@ pub unsafe fn send_cmd<'a, T, R>(
             }
         }
     }
-
-    let translated_raw = translate.finish();
-    assert!(translated_raw.len() <= MAX_IPC_ARGS);
 
     let header = IPCHeader {
         command: command_id,
@@ -570,8 +573,7 @@ const fn bytes_to_words(bytes: usize) -> usize {
     (bytes + size_of::<WORD>() - 1) / size_of::<WORD>()
 }
 
-// TODO: What is the actual limit here? It might be 63 because the header takes up 1 
-pub const MAX_IPC_ARGS: usize = 64;
+pub const IPC_CMDBUF_WORDS: usize = 64;
 
 // TODO: Parse pages from the 3dbrew wiki for T, R
 // Most pages have the same structure and some even have expressions for
@@ -579,7 +581,7 @@ pub const MAX_IPC_ARGS: usize = 64;
 
 /// Simple wrapper to send IPC commands that do not involve buffer/handle translation.
 ///
-/// Panics if the sizes of types T or R are > [`MAX_IPC_ARGS`] `* size_of::<u32>()`.
+/// Panics if the sizes of types T or R are > [`IPC_CMDBUF_WORDS`] `* size_of::<u32>()`.
 ///
 /// # Safety
 /// In general, to use an IPC command safely you should read the [3dbrew
@@ -591,8 +593,8 @@ pub const MAX_IPC_ARGS: usize = 64;
 /// 1. The caller must ensure that a valid object of type R is
 ///    stored at ThreadCommandBuffer + 0x02 upon success of the command.
 pub unsafe fn send_struct<T, R>(handle: Handle, command_id: u16, obj: T) -> ctru::Result<R> {
-    assert!(bytes_to_words(size_of::<T>()) <= MAX_IPC_ARGS);
-    assert!(bytes_to_words(size_of::<R>()) <= MAX_IPC_ARGS);
+    assert!(bytes_to_words(size_of::<T>()) <= IPC_CMDBUF_WORDS - 1); // Account for the header
+    assert!(bytes_to_words(size_of::<R>()) <= IPC_CMDBUF_WORDS - 2); // Account for header+response code
     let ipc = tls::getThreadCommandBuffer();
 
     let header = IPCHeader {
