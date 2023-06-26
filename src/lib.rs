@@ -503,7 +503,7 @@ pub unsafe fn send_cmd<'a, T, R>(
 
     // SAFETY: This ref is dropped at the end of this method
     let translate_buf = std::slice::from_raw_parts(
-        ipc_buf.add(response_header.normal_params + 1) as *const u32,
+        ipc_buf.add(response_header.normal_params + 2) as *const u32,
         response_header.translate_params,
     );
 
