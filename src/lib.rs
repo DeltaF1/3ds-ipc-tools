@@ -77,11 +77,20 @@ impl From<IPCHeader> for u32 {
     }
 }
 
+/// See <https://3dbrew.org/wiki/IPC#Handle_Translation>
+pub enum HandleOptions {
+    /// Copy handles to the destination process but retain access to them
+    CopyHandles = 0b00,
+    /// Close handles before sending them to the destination process
+    MoveHandles = 0b01,
+    /// Handles are ignored and instead the current process' ID is sent
+    SendProcessID = 0b10
+}
+
 enum Translation<'a> {
     Handles {
-        closed_for_caller: bool,
-        replace_with_process_id: bool,
-        handles: Vec<Handle>,
+        options: HandleOptions,
+        handles: Vec<Handle>
     },
     Static {
         static_index: usize,
@@ -112,12 +121,13 @@ impl From<&Translation<'_>> for Vec<u32> {
         let mut v = vec![];
         match value {
             Translation::Handles {
-                closed_for_caller,
-                replace_with_process_id,
+                options,
                 handles,
             } => {
+                let closed_for_caller = matches!(options, HandleOptions::MoveHandles);
+                let replace_with_process_id = matches!(options, HandleOptions::SendProcessID);
                 let header =
-                    handle_descriptor(handles.len(), *closed_for_caller, *replace_with_process_id);
+                    handle_descriptor(handles.len(), closed_for_caller, replace_with_process_id);
                 v.push(header);
                 v.extend_from_slice(handles);
             }
@@ -212,8 +222,11 @@ impl From<u32> for TranslationPermission {
     }
 }
 
+// TODO: Implement a HandleIterator
 // https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=8160b63e6c20035e1540603f657b00a2
 // the PhantomData seems to be enough to keep borrows until this struct is dropped
+/// Represents translation parameters to pass to an IPC call. See
+/// <https://3dbrew.org/wiki/IPC#Message_Structure>
 impl<'a> TranslateParams<'a> {
     pub fn new() -> Self {
         TranslateParams(vec![])
@@ -225,14 +238,12 @@ impl<'a> TranslateParams<'a> {
     /// Send handles to the destination process
     pub fn add_handles(
         &mut self,
-        closed_for_caller: bool, // TODO: Replace this with a HandleOptions enum
-        replace_with_process_id: bool,
-        handles: Vec<Handle>,
+        options: HandleOptions,
+        handles: Vec<Handle>
     ) -> &mut Self {
         self.0.push(Translation::Handles {
-            closed_for_caller,
-            replace_with_process_id,
-            handles,
+            options,
+            handles
         });
         self
     }
@@ -317,13 +328,16 @@ impl<'a> TranslateParams<'a> {
             match typ {
                 0 => {
                     let num = ((header >> 26) + 1) as usize;
-                    let closed_for_caller = header & 0x10 > 0;
-                    let replace_with_process_id = header & 0x20 > 0;
+                    let options = match header & 0x30 >> 4 {
+                       0b00 => HandleOptions::CopyHandles,
+                       0b01 => HandleOptions::MoveHandles,
+                       0b10 => HandleOptions::SendProcessID,
+                       _ => unreachable!("Invalid Handle translation option!")
+                    };
 
                     v.push(Translation::Handles {
-                        closed_for_caller,
-                        replace_with_process_id,
-                        handles: Vec::from(&params[(i + 1)..(i + 1 + num)]),
+                        options,
+                        handles: Vec::from(&params[(i + 1)..(i + 1 + num)])
                     });
 
                     iter.advance_by(num).unwrap();
