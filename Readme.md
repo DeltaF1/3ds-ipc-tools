@@ -1,3 +1,4 @@
+⚠️ Not finished/tested yet, this is just published to get feedback on the design ⚠️
 # ipc-tools
 library to help make safe IPC wrappers for ctru-rs
 
