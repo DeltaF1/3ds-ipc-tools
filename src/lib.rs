@@ -79,6 +79,7 @@ impl From<IPCHeader> for u32 {
 }
 
 /// See <https://3dbrew.org/wiki/IPC#Handle_Translation>
+#[derive(Copy, Clone)]
 pub enum HandleOptions {
     /// Copy handles to the destination process but retain access to them
     CopyHandles = 0b00,
@@ -220,7 +221,6 @@ impl From<u32> for TranslationPermission {
     }
 }
 
-// TODO: Implement a HandleIterator
 // https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=8160b63e6c20035e1540603f657b00a2
 // the PhantomData seems to be enough to keep borrows until this struct is dropped
 /// Represents translation parameters to pass to an IPC call. See
@@ -362,7 +362,15 @@ impl<'a> TranslateParams<'a> {
         TranslateParams(v)
     }
 
-    // TODO: function to retrieve handles
+    pub fn handles_iter(&self) -> impl Iterator<Item = (HandleOptions, &[Handle])> {
+        self.0.iter().filter_map(|t| {
+            if let Translation::Handles { options, handles } = t {
+                Some((*options, &**handles))
+            } else {
+                None
+            }
+        })
+    }
 }
 
 #[derive(Default)]
