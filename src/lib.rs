@@ -84,13 +84,13 @@ pub enum HandleOptions {
     /// Close handles before sending them to the destination process
     MoveHandles = 0b01,
     /// Handles are ignored and instead the current process' ID is sent
-    SendProcessID = 0b10
+    SendProcessID = 0b10,
 }
 
 enum Translation<'a> {
     Handles {
         options: HandleOptions,
-        handles: Vec<Handle>
+        handles: Vec<Handle>,
     },
     Static {
         static_index: usize,
@@ -120,10 +120,7 @@ impl From<&Translation<'_>> for Vec<u32> {
     fn from(value: &Translation) -> Self {
         let mut v = vec![];
         match value {
-            Translation::Handles {
-                options,
-                handles,
-            } => {
+            Translation::Handles { options, handles } => {
                 let closed_for_caller = matches!(options, HandleOptions::MoveHandles);
                 let replace_with_process_id = matches!(options, HandleOptions::SendProcessID);
                 let header =
@@ -236,15 +233,8 @@ impl<'a> TranslateParams<'a> {
     // way to handle the lifetimes when parsing? Or maybe just use a SmallVec
     // Alternatively, write a whole new kind of struct to hold returned translate params
     /// Send handles to the destination process
-    pub fn add_handles(
-        &mut self,
-        options: HandleOptions,
-        handles: Vec<Handle>
-    ) -> &mut Self {
-        self.0.push(Translation::Handles {
-            options,
-            handles
-        });
+    pub fn add_handles(&mut self, options: HandleOptions, handles: Vec<Handle>) -> &mut Self {
+        self.0.push(Translation::Handles { options, handles });
         self
     }
 
@@ -329,15 +319,15 @@ impl<'a> TranslateParams<'a> {
                 0 => {
                     let num = ((header >> 26) + 1) as usize;
                     let options = match header & 0x30 >> 4 {
-                       0b00 => HandleOptions::CopyHandles,
-                       0b01 => HandleOptions::MoveHandles,
-                       0b10 => HandleOptions::SendProcessID,
-                       _ => unreachable!("Invalid Handle translation option!")
+                        0b00 => HandleOptions::CopyHandles,
+                        0b01 => HandleOptions::MoveHandles,
+                        0b10 => HandleOptions::SendProcessID,
+                        _ => unreachable!("Invalid Handle translation option!"),
                     };
 
                     v.push(Translation::Handles {
                         options,
-                        handles: Vec::from(&params[(i + 1)..(i + 1 + num)])
+                        handles: Vec::from(&params[(i + 1)..(i + 1 + num)]),
                     });
 
                     iter.advance_by(num).unwrap();
@@ -506,7 +496,10 @@ pub unsafe fn send_cmd<'a, T, R>(
 
     let translated_raw = translate.finish();
     // There's only IPC_CMDBUF_WORDS words in the IPC cmdbuf that the translate params and normal params have to share
-    assert!(bytes_to_words(size_of::<T>()) + bytes_to_words(translated_raw.len()) <= IPC_CMDBUF_WORDS - 1);
+    assert!(
+        bytes_to_words(size_of::<T>()) + bytes_to_words(translated_raw.len())
+            <= IPC_CMDBUF_WORDS - 1
+    );
 
     unsafe {
         for (i, buffer) in static_receive_buffers.buffers.iter().enumerate() {
