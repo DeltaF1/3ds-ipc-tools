@@ -636,16 +636,24 @@ enum ServiceOp {
     GetName,
 }
 
+#[repr(C)]
+union ControlArg {
+    handle: Handle,
+    service_name: *const u8,
+    ptr: *const ffi::c_void,
+}
+
 // TODO: #[cfg(feature = "luma-extensions")]
+// TODO: Move to its own module/crate/integrate luma extensions into a module in ctru-rs
 #[allow(non_snake_case)]
 unsafe fn svcControlService(
     op: ServiceOp,
-    ptr1: *mut ffi::c_void,
-    ptr2: *const ffi::c_void, // FIXME: This is a ptr in one call and a Handle in another
+    output: *mut ffi::c_void,
+    input: ControlArg,
 ) -> ctru_sys::Result {
     let res;
     unsafe {
-        asm!("svc 0xB0", inout("r0") op as i32 => res, in("r1") ptr1, in("r2") ptr2);
+        asm!("svc 0xB0", inout("r0") op as i32 => res, in("r1") output, in("r2") input.ptr);
     }
     res
 }
@@ -667,7 +675,9 @@ pub unsafe fn steal_service_handle(name: &str) -> ctru::Result<Handle> {
         svcControlService(
             ServiceOp::StealClientSession,
             &mut handle as *mut Handle as *mut c_void,
-            cstr.as_ptr() as *const c_void,
+            ControlArg {
+                service_name: cstr.as_ptr(),
+            },
         )
     };
     ResultCode(res)?;
@@ -681,7 +691,7 @@ pub fn get_service_name(handle: Handle) -> ctru::Result<String> {
         svcControlService(
             ServiceOp::GetName,
             &mut name as *mut _ as *mut _,
-            handle as _, // This isn't a ptr but this method can be called with different args so idk how to make it better
+            ControlArg { handle },
         )
     };
     ResultCode(res)?;
