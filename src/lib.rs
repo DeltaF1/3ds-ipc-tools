@@ -333,22 +333,7 @@ impl<'a> TranslateParams<'a> {
                     iter.advance_by(num).unwrap();
                 }
                 1 => {
-                    unimplemented!("Static buffer descriptor should not be de-serialized")
-                    /*
-                    let static_buffer_id = ((header >> 10) & 0xf) as usize;
-
-                    let static_buffer = unsafe { get_static_buffer(static_buffer_id) };
-
-                    let data = static_buffer.buffer;
-                    let len = (static_buffer.descriptor >> 14) as usize;
-
-                    v.push(Translation::Static {
-                        static_index: static_buffer_id,
-                        ptr: data,
-                        len,
-                        _marker: PhantomData,
-                    })
-                    */
+                    unreachable!("Static buffer descriptor should not be de-serialized")
                 }
                 5 | 6 | 7 => {
                     let perms: TranslationPermission = (typ & 0x3).into();
@@ -370,7 +355,7 @@ impl<'a> TranslateParams<'a> {
                         TranslationPermission::ReadWrite => todo!(),
                     });
                 }
-                _ => unreachable!(),
+                _ => unreachable!("Invalid translation parameter type"),
             }
         }
         TranslateParams(v)
