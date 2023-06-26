@@ -384,6 +384,57 @@ impl<'a> StaticReceiveParams<'a> {
         StaticReceiveParams::default()
     }
 
+    /// Designate a mutable object in which to store data returned to the i-th buffer by the IPC
+    /// call. See <https://3dbrew.org/wiki/IPC#Static_Buffer_Translation> and
+    /// <https://3dbrew.org/wiki/Thread_Local_Storage>
+    ///
+    /// # Example - FRDU:GetMyPassword
+    /// [FRDU:GetMyPassword](https://www.3dbrew.org/wiki/FRDU:GetMyPassword) copies the password
+    /// into a pre-prepared static buffer upon return.
+    ///
+    /// ```
+    /// # use ipc_tools::*;
+    /// # use ctru_sys::Handle;
+    /// # pub unsafe fn send_cmd<'a, T, R>(
+    /// # handle: Handle,
+    /// # command_id: u16,
+    /// # obj: T,
+    /// # translate: TranslateParams<'_>,
+    /// # static_receive_buffers: StaticReceiveParams<'_>
+    /// # ) -> ctru::Result<((), TranslateParams<'a>)> {Ok(((), TranslateParams::new()))}
+    /// # let frdu_handle: Handle = 0x0;
+    /// const MAX_BUFFER_SIZE: usize = 0x100;
+    /// let mut password = [0u8; MAX_BUFFER_SIZE];
+    ///
+    /// // The only normal param is the buffer size
+    /// let normal_params = MAX_BUFFER_SIZE;
+    ///
+    /// let mut to_receive = StaticReceiveParams::new();
+    /// to_receive.add_receive_buffer(0, &mut password);
+    ///
+    /// // SAFETY: See https://www.3dbrew.org/wiki/FRDU:GetMyPassword
+    /// unsafe {
+    ///     send_cmd::<usize, ()>(frdu_handle, 0x0010, normal_params, TranslateParams::new(), to_receive).unwrap();
+    /// }
+    ///
+    /// // password now contains the data returned from FRDU:GetMyPassword
+    /// let password_string = String::from_utf8(password.into()).unwrap();
+    /// ```
+    /// # Borrowing
+    /// Any references added in this way will last for the lifetime of the [StaticReceiveParams]. The
+    /// following is invalid because each object is mutably borrowed until the [StaticReceiveParams] object is dropped or consumed by [send_struct].
+    ///
+    /// ```compile_fail
+    /// # use ipc_tools::StaticReceiveParams;
+    /// let mut obj1 = [0u8; 16];
+    ///
+    /// let mut to_receive = StaticReceiveParams::new();
+    /// to_receive.add_receive_buffer(0, &mut obj1); // obj1 is borrowed for the lifetime of to_receive
+    ///
+    /// obj1[0] = 10; // Not allowed!
+    ///
+    /// drop(to_receive);
+    /// ```
     pub fn add_receive_buffer<T>(&mut self, i: usize, r: &'a mut T) {
         debug_assert!(
             self.buffers[i].is_none(),
