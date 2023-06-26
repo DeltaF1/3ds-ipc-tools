@@ -6,7 +6,7 @@ Thanks to piepie62, declan, Kartik on the Nintendo Homebrew Discord for answerin
 
 ## How to use
 
-Install devKitPro and https://github.com/rust3ds/cargo-3ds/.
+Install devKitPro and <https://github.com/rust3ds/cargo-3ds/>.
 
 The two main entry points for this library are `send_struct` and `send_cmd`. `send_struct` is a simple wrapper for IPC commands that only have normal params in the request and response. `send_cmd` has more arguments which allow it to express IPC commands with translate params and static buffer-returned values.
 
@@ -14,15 +14,15 @@ For more information run `cargo 3ds doc`.
 
 ## Example
 
-1. Find the wiki page for the command you want to wrap. In this example we will be using https://www.3dbrew.org/wiki/AM:ReadTwlBackupInfo.
+1. Find the wiki page for the command you want to wrap. In this example we will be using <https://www.3dbrew.org/wiki/AM:ReadTwlBackupInfo>.
 
 2. Look at the "Request" table on the wiki page
 
-The first word in the table is the header, whose format is here: https://www.3dbrew.org/wiki/IPC#Message_Structure
+The first word in the table is the header, whose format is here: <https://www.3dbrew.org/wiki/IPC#Message_Structure>
 
 |Index Word |Description|
 |:----|:----|
-|0 |Header code [0x001E00C8]|
+|0 |Header code \[0x001E00C8\]|
 
 From this header we can see that the command id is 0x001E, there are 3 normal params, and there are 8 translate params.
 
@@ -51,7 +51,7 @@ struct Params {
 
 The next 8 words are the "translate" params. These parameters are used to transfer larger or more complicated pieces of data between processes. Each paramter consists of a header followed by some number of data words afterwards. To encapsulate these parameters we construct a `TranslateParams` struct.
 
-```rust
+```rust,ignore
 let mut translate_params = TranslateParams::new();
 ```
 
