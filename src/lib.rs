@@ -527,8 +527,8 @@ fn check_command_header<T>(header: u32, _normal: &T, translate: &TranslateParams
 ///
 /// # Safety
 ///
-/// In general, to use an IPC command safely you should read the [3dbrew
-/// wiki](https://www.3dbrew.org/wiki/) page for that command.
+/// In general, to use an IPC command safely you should read the
+/// [3dbrew wiki](https://www.3dbrew.org/wiki/) page for that command.
 ///
 /// This is a non-exhaustive list of safety requirements to use this function. This is a foreign call
 /// so the receiving code could do anything!
@@ -556,8 +556,7 @@ pub unsafe fn send_cmd<'a, T, R>(
     translate: TranslateParams,
     static_receive_buffers: StaticReceiveParams,
 ) -> ctru::Result<(R, TranslateParams<'a>)> {
-    // TODO: Explicitly do this as consts if possible
-    assert!(size_of::<T>() % size_of::<u32>() == 0);
+    assert_eq!(size_of::<T>() % size_of::<u32>(), 0);
     assert!(bytes_to_words(size_of::<T>()) <= IPC_CMDBUF_WORDS - 1); // Account for the header
     assert!(bytes_to_words(size_of::<R>()) <= IPC_CMDBUF_WORDS - 2); // Account for header+response code
 
@@ -704,7 +703,6 @@ pub unsafe fn send_struct<T, R>(handle: Handle, command_id: u16, obj: T) -> ctru
     // E.g. if R does not fit the return data then the type will be invalid
     let retval = ipc.add(2) as *const R;
 
-    // FIXME: Should this just return a pointer?
     Ok(retval.read())
 }
 
