@@ -376,6 +376,9 @@ impl<'a> TranslateParams<'a> {
         self.0.iter().flat_map(Into::<Vec<u32>>::into).collect()
     }
 
+    // TODO: Maybe return Result<_, TranslateParamParseError>?
+    // If there are invalid translate params coming back then it's probably too late to fix
+    // anything
     /// Parse the translate params returned from an IPC call
     ///
     /// The main purpose of this is to retrieve any [`Handle`]s that have been sent back
@@ -392,7 +395,7 @@ impl<'a> TranslateParams<'a> {
                         0b00 => HandleOptions::CopyHandles,
                         0b01 => HandleOptions::MoveHandles,
                         0b10 => HandleOptions::SendProcessID,
-                        _ => unreachable!("Invalid Handle translation option!"),
+                        _ => panic!("Invalid Handle translation option!"),
                     };
 
                     v.push(Translation::Handles {
@@ -403,7 +406,7 @@ impl<'a> TranslateParams<'a> {
                     iter.advance_by(num).unwrap();
                 }
                 1 => {
-                    unreachable!("Static buffer descriptor should not be de-serialized")
+                    panic!("Static buffer descriptor should not be de-serialized")
                 }
                 5 | 6 | 7 => {
                     let perms: TranslationPermission = (typ & 0x3).into();
@@ -425,7 +428,7 @@ impl<'a> TranslateParams<'a> {
                         TranslationPermission::ReadWrite => todo!(),
                     });
                 }
-                _ => unreachable!("Invalid translation parameter type"),
+                _ => panic!("Invalid translation parameter type"),
             }
         }
         TranslateParams(v)
