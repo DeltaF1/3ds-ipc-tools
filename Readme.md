@@ -8,7 +8,7 @@ Thanks to piepie62, declan, Kartik on the Nintendo Homebrew Discord for answerin
 
 Install devKitPro and <https://github.com/rust3ds/cargo-3ds/>.
 
-The two main entry points for this library are `send_struct` and `send_cmd`. `send_struct` is a simple wrapper for IPC commands that only have normal params in the request and response. `send_cmd` has more arguments which allow it to express IPC commands with translate params and static buffer-returned values.
+The two main entry points for this library are [`send_struct`] and [`send_cmd`]. [`send_struct`] is a simple wrapper for IPC commands that only have normal params in the request and response. [`send_cmd`] has more arguments which allow it to express IPC commands with translate params and static buffer-returned values.
 
 For more information run `cargo 3ds doc`.
 
@@ -133,7 +133,7 @@ In the case of mapped buffer descriptors there is no need to do anything with th
 4. Now it's time to put all of this together.
 
 ```rust,no_run
-# // Stubbed types
+# // Stubbed types, ignore this
 # struct Banner {} struct TwlBackupInfo {}
 # impl Banner {fn new() -> Self { todo!() } } impl TwlBackupInfo { fn new() -> Self { todo!() } }
 use std::mem::size_of_val;
