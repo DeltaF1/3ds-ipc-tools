@@ -567,12 +567,10 @@ pub unsafe fn send_cmd<'a, T, R>(
             <= IPC_CMDBUF_WORDS - 1
     );
 
-    unsafe {
-        for (i, buffer) in static_receive_buffers.buffers.iter().enumerate() {
-            if let Some(buf) = buffer {
-                // TODO: Make this more efficient by not calling getThreadStaticBuffer multiple times
-                set_static_buffer(i, buf.clone());
-            }
+    for (i, buffer) in static_receive_buffers.buffers.iter().enumerate() {
+        if let Some(buf) = buffer {
+            // TODO: Make this more efficient by not calling getThreadStaticBuffer multiple times
+            set_static_buffer(i, buf.clone());
         }
     }
 
@@ -598,11 +596,9 @@ pub unsafe fn send_cmd<'a, T, R>(
     let res = ctru_sys::svcSendSyncRequest(handle);
 
     // Delete all the static buffer descriptors after the call is done, even if it failed
-    unsafe {
-        for (i, buffer) in static_receive_buffers.buffers.iter().enumerate() {
-            if buffer.is_some() {
-                clear_static_buffer(i);
-            }
+    for (i, buffer) in static_receive_buffers.buffers.iter().enumerate() {
+        if buffer.is_some() {
+            clear_static_buffer(i);
         }
     }
 
