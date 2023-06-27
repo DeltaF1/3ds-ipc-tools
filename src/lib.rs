@@ -199,10 +199,6 @@ pub const fn handle_descriptor(
     header
 }
 
-/// Struct to construct translated paramters for an IPC call.
-#[derive(Default)]
-pub struct TranslateParams<'a>(Vec<Translation<'a>>);
-
 #[repr(u32)]
 #[derive(Clone, Copy)]
 enum TranslationPermission {
@@ -222,10 +218,82 @@ impl From<u32> for TranslationPermission {
     }
 }
 
-// https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=8160b63e6c20035e1540603f657b00a2
-// the PhantomData seems to be enough to keep borrows until this struct is dropped
-/// Represents translation parameters to pass to an IPC call. See
-/// <https://3dbrew.org/wiki/IPC#Message_Structure>
+/// Represents translation parameters to pass to an IPC call.
+///
+/// See <https://3dbrew.org/wiki/IPC#Message_Structure>
+///
+/// TranslateParams manages lifetimes so that references can be safely used in [`send_cmd`].
+/// For example:
+///
+/// ```
+/// # use ipc_tools::*;
+/// let mut translate = TranslateParams::new();
+///
+/// let obj1 = "Some message";
+/// let mut obj2 = false;
+/// let obj3: u32 = 42;
+///
+/// translate.add_read_buffer(&obj1);
+/// translate.add_write_buffer(&mut obj2);
+/// translate.add_static_buffer(0, &obj3);
+/// ```
+///
+/// The two immutable objects can still be read
+///
+/// ```
+/// # use ipc_tools::*;
+/// # let mut translate = TranslateParams::new();
+/// # let obj1 = "Some message";
+/// # let mut obj2 = false;
+/// # let obj3: u32 = 42;
+/// # translate.add_read_buffer(&obj1);
+/// # translate.add_write_buffer(&mut obj2);
+/// # translate.add_static_buffer(0, &obj3);
+/// println!("{}", &obj1);
+/// dbg!(&obj3);
+/// ```
+///
+/// Anything borrowed mutably by [`TranslateParams::add_write_buffer`] or [`TranslateParams::add_read_write_buffer`] can't be
+/// accessed
+/// until the translate struct is dropped or consumed by [`send_cmd`]
+///
+/// ```compile_fail
+/// # use ipc_tools::*;
+/// # let mut translate = TranslateParams::new();
+/// # let obj1 = "Some message";
+/// # let mut obj2 = false;
+/// # let obj3: u32 = 42;
+/// # translate.add_read_buffer(&obj1);
+/// # translate.add_write_buffer(&mut obj2);
+/// # translate.add_static_buffer(0, &obj3);
+/// println!("{}", &obj2);
+/// obj2 = true;
+/// unsafe { send_cmd::<(),()>(handle, cmd, (), translate, StaticReceiveParams::default()) };
+/// # std::hint::black_box(translate);
+/// ```
+///
+/// FIXME
+/// Access properly after `send_cmd`
+///
+/// ```
+/// # use ipc_tools::*;
+/// # let mut translate = TranslateParams::new();
+/// # let obj1 = "Some message";
+/// # let mut obj2 = false;
+/// # let obj3: u32 = 42;
+/// # translate.add_read_buffer(&obj1);
+/// # translate.add_write_buffer(&mut obj2);
+/// # translate.add_static_buffer(0, &obj3);
+/// # let cmd = 0;
+/// # let handle = 0;
+/// unsafe { send_cmd::<(),()>(handle, cmd, (), translate, StaticReceiveParams::default()) };
+/// // obj2 may have been modified by the IPC call
+/// println!("{}", &obj2);
+/// obj2 = true;
+/// ```
+#[derive(Default)]
+pub struct TranslateParams<'a>(Vec<Translation<'a>>);
+
 impl<'a> TranslateParams<'a> {
     pub fn new() -> Self {
         TranslateParams(vec![])
