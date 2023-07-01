@@ -49,7 +49,7 @@ struct Params {
 }
 ```
 
-The next 8 words are the "translate" params. These parameters are used to transfer larger or more complicated pieces of data between processes. Each paramter consists of a header followed by some number of data words afterwards. To encapsulate these parameters we construct a `TranslateParams` struct.
+The next 8 words are the "translate" params. These parameters are used to transfer larger or more complicated pieces of data between processes. Each parameter consists of a header followed by some number of data words afterwards. To encapsulate these parameters we construct a `TranslateParams` struct.
 
 ```rust,ignore
 let mut translate_params = TranslateParams::new();
@@ -72,7 +72,7 @@ translate_params.add_handles(HandleOptions::MoveHandles, vec![file_handle]);
 |6 |(Output Info Size << 4) \| 0xC|
 |7 |TwlBackupInfo Output Pointer. Processing is skipped for this when the pointer is NULL.|
 
-The second paramater ends in `0xC` which means it's a write-only [mapped buffer descriptor](https://www.3dbrew.org/wiki/IPC#Buffer_Mapping_Translation). 
+The second parameter ends in `0xC` which means it's a write-only [mapped buffer descriptor](https://www.3dbrew.org/wiki/IPC#Buffer_Mapping_Translation).
 
 We can add one of these parameters with a mutable reference.
 
@@ -113,7 +113,7 @@ The next word is a Result code. This value will be an error code if the call fai
 |:----|:----|
 |1 |Result code|
 
-The words following the result code are the return parameters. Most wiki pages don't say exlicitly which ones are normal params and which are translated, but it's usually easy to deduce from context clues (e.g. we can see the `0xC` descriptor tag and the fact that "pointers" are mentioned). In this case there are no normal parameters and the buffers we mapped earlier are returned to us as translate parameters. The lack of normal parameters can be represented by passing `()` as the return type.
+The words following the result code are the return parameters. Most wiki pages don't say explicitly which ones are normal params and which are translated, but it's usually easy to deduce from context clues (e.g. we can see the `0xC` descriptor tag and the fact that "pointers" are mentioned). In this case there are no normal parameters and the buffers we mapped earlier are returned to us as translate parameters. The lack of normal parameters can be represented by passing `()` as the return type.
 
 ```rust
 type Return = ();
@@ -121,11 +121,11 @@ type Return = ();
 
 |Index Word |Description|
 |:----|:----|
-|2 |(Output Info Size << 4) | 0xC|
+|2 |(Output Info Size << 4) \| 0xC|
 |3 |TwlBackupInfo Output Pointer.|
-|4 |(Banner Size << 4) | 0xC|
+|4 |(Banner Size << 4) \| 0xC|
 |5 |DSiWare Banner Output Pointer.|
-|6 |(Working Buffer Size << 4) | 0xC|
+|6 |(Working Buffer Size << 4) \| 0xC|
 |7 |Working Buffer Pointer |
 
 In the case of mapped buffer descriptors there is no need to do anything with them when they are returned from an IPC call, so we can move on.
