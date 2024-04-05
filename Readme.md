@@ -174,7 +174,7 @@ fn ReadTwlBackupInfo(
 
     // In this case there are no parameters being passed back and we don't care about the translate parameters 
     type Return = ();
-    let (_normal_return, _translate_return): (Return, ipc_tools::TranslateParams) = unsafe {
+    let (_normal_return, _translate_return): (Return, ipc_tools::TranslateParams<_>) = unsafe {
         ipc_tools::send_cmd::<Params, Return>(
             service_handle,
             COMMAND,
